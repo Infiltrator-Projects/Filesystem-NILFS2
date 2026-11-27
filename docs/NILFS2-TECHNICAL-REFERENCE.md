@@ -12,6 +12,8 @@ The on-disk byte order is little-endian. The primary superblock starts at byte 1
 
 Offsets 56,64,72 and 80 contain the 64-bit latest checkpoint number, latest partial-segment block address, latest segment sequence and free-block count. Times begin at 88; mount counts and state at 112..119; first ordinary inode at 140. Declared inode/DAT/checkpoint/segment-usage entry sizes at 144,146,148,150 (16-bit). UUID at 152; 80-byte label at 168; compatible, read-only-compatible and incompatible 64-bit feature words at 256,264,272. Validate checksum over the declared prefix with the checksum field treated according to the native routine. Compare both valid copies and corroborate their latest segment anchors; do not choose merely by wall-clock time. Unsupported incompatible features prohibit mounting.
 
+A valid signature in either superblock is not itself a committed root. Corroborate checksum, sequence/checkpoint and reachable state, and preserve all physical blocks reachable through retained checkpoints when cleaning.
+
 ## Segment summaries and partial segments
 
 A full segment is an allocation and cleaning unit; one or more partial segments contain appended updates. A partial segment begins with a summary. Header offsets: data checksum 0, summary checksum 4, magic 0x1EAFFA11 at 8, header bytes 12 (16-bit), flags 14, sequence 16, creation time 24, next segment block address 32 (all 64-bit), block count 40, file-info count 44, summary byte count 48, reserved 52, checkpoint number 56. File-info records are 24 bytes: inode, checkpoint (64-bit each), total blocks and data blocks (32-bit each). Subsequent block-info records depend on whether the owner is DAT, a data block or a tree node. Validate summary spans and payload counts before parsing variable records; summaries can cross block boundaries.
@@ -52,8 +54,14 @@ The sufile header begins with 64-bit clean-segment count, dirty count and last a
 
 A logical log may span several partial segments; verify summary CRCs, payload coverage, sequence and begin/end markers. Recover from the most recent coherent super-root and only admit the exact native roll-forward treatment of complete data-sync logs beyond it. A dirty superblock or higher segment sequence alone is not proof of commitment. For write qualification, inject failures at every append, super-root publication, superblock update and cleaning boundary. Defrag must preserve virtual identities, checkpoint visibility, and allocation invariants; physical contiguity improvement is not permission to rewrite historical views. Reserve cleaning headroom; avoid circular allocation where collection needs space that it cannot obtain.
 
+## Implementation and qualification boundary
+
+The independent provider uses Common V2: https://github.com/Infiltrator-Projects/Libraries/blob/main/docs/FILESYSTEM_COMMON_ABI_V2.md . Negotiate actual operation masks and media profiles. Distinguish unsupported, corrupt, I/O and stale-handle results. Require bounded host I/O, exclusive unmounted ownership and durable flush before mutation. Test Media and Defragmenter consume the same engine, not separate format parsers. Hosted and freestanding binaries, relocation, recovery, BOOT, kernel integration and packages require separate exact-source evidence. Current support belongs to the repository README and qualification records. The intended package paths are /System/Filesystems/ and /System/Resources/Documentation/; the reference is not an installation or release-status claim.
+
 ## References and verification
 
 Pinned layout: https://github.com/torvalds/linux/blob/v6.12/include/uapi/linux/nilfs2_ondisk.h . Algorithms: https://github.com/torvalds/linux/tree/v6.12/fs/nilfs2 (alloc.c, dat.c, cpfile.c, sufile.c, btree.c, recovery.c). Design and tools: https://nilfs.sourceforge.io/ and https://docs.kernel.org/filesystems/nilfs2.html . Test independently formatted images, both superblocks, multiple retained snapshots, DAT allocator group boundaries, tree splits, sparse mappings, damaged summaries, truncated logical logs and cleaning with snapshots. Compare every historical and current payload against independent mounts. Exact summary checksum coverage, binfo subtypes, maximum-record encoding and all recovery paths need further source/fixture validation before independent writer compatibility is claimed. The repository's prior design documents are preserved as historical appendices.
 
-The PDF preserves both earlier documents as historical appendices.
+Test independently recorded checkpoints and snapshots, damaged DAT translations and interruption-safe cleaning.
+
+Retained source: https://github.com/Infiltrator-Projects/Filesystems/blob/101026021d9088d80b7f0f472d9061f0e2c688a3/native/filesystems/nilfs2/linux/super.c (blob 7ed64df82d).
