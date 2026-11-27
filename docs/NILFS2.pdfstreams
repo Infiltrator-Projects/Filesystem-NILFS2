@@ -263,20 +263,21 @@ BT /F2 22 Tf 43 784 Td (NILFS2 - technical reference) Tj ET
 BT /F2 22 Tf 43 784 Td (NILFS2 - technical reference) Tj ET
 0.08 0.14 0.20 rg BT /F2 15 Tf 43 736 Td (15. References and verification) Tj ET
 0.08 0.14 0.20 rg BT /F3 10 Tf 43 706 Td (Pinned layout:) Tj ET
-0.08 0.14 0.20 rg BT /F3 10 Tf 43 692 Td (https://github.com/torvalds/linux/blob/v6.12/include/uapi/linux/nilfs2_ondisk.h .) Tj ET
-0.08 0.14 0.20 rg BT /F3 10 Tf 43 678 Td (Algorithms: https://github.com/torvalds/linux/tree/v6.12/fs/nilfs2 \(alloc.c, dat.c,) Tj ET
-0.08 0.14 0.20 rg BT /F3 10 Tf 43 664 Td (cpfile.c, sufile.c, btree.c, recovery.c\). Design and tools:) Tj ET
-0.08 0.14 0.20 rg BT /F3 10 Tf 43 650 Td (https://nilfs.sourceforge.io/ and https://docs.kernel.org/filesystems/nilfs2.html .) Tj ET
-0.08 0.14 0.20 rg BT /F3 10 Tf 43 636 Td (Test independently formatted images, both superblocks, multiple retained snapshots,) Tj ET
-0.08 0.14 0.20 rg BT /F3 10 Tf 43 622 Td (DAT allocator group boundaries, tree splits, sparse mappings, damaged summaries,) Tj ET
-0.08 0.14 0.20 rg BT /F3 10 Tf 43 608 Td (truncated logical logs and cleaning with snapshots. Compare every historical and) Tj ET
-0.08 0.14 0.20 rg BT /F3 10 Tf 43 594 Td (current payload against independent mounts. Exact summary checksum coverage, binfo) Tj ET
-0.08 0.14 0.20 rg BT /F3 10 Tf 43 580 Td (subtypes, maximum-record encoding and all recovery paths need further) Tj ET
-0.08 0.14 0.20 rg BT /F3 10 Tf 43 566 Td (source/fixture validation before independent writer compatibility is claimed. The) Tj ET
-0.08 0.14 0.20 rg BT /F3 10 Tf 43 552 Td (repository's prior design documents are preserved as historical appendices.) Tj ET
-0.08 0.14 0.20 rg BT /F3 10 Tf 43 528 Td (Test independently recorded checkpoints and snapshots, damaged DAT translations and) Tj ET
-0.08 0.14 0.20 rg BT /F3 10 Tf 43 514 Td (interruption-safe cleaning.) Tj ET
-0.08 0.14 0.20 rg BT /F3 10 Tf 43 490 Td (Retained source:) Tj ET
-0.08 0.14 0.20 rg BT /F3 10 Tf 43 476 Td (https://github.com/Infiltrator-Projects/Filesystems/blob/101026021d9088d80b7f0f472d) Tj ET
-0.08 0.14 0.20 rg BT /F3 10 Tf 43 462 Td (9061f0e2c688a3/native/filesystems/nilfs2/linux/super.c \(blob 7ed64df82d\).) Tj ET
+0.08 0.14 0.20 rg BT /F3 10 Tf 43 692 Td (https://github.com/torvalds/linux/blob/v6.12/include/uapi/linux/nilfs2_ondisk.h) Tj ET
+0.08 0.14 0.20 rg BT /F3 10 Tf 43 678 Td (. Algorithms: https://github.com/torvalds/linux/tree/v6.12/fs/nilfs2 \(alloc.c,) Tj ET
+0.08 0.14 0.20 rg BT /F3 10 Tf 43 664 Td (dat.c, cpfile.c, sufile.c, btree.c, recovery.c\). Design and tools:) Tj ET
+0.08 0.14 0.20 rg BT /F3 10 Tf 43 650 Td (https://nilfs.sourceforge.io/ and) Tj ET
+0.08 0.14 0.20 rg BT /F3 10 Tf 43 636 Td (https://docs.kernel.org/filesystems/nilfs2.html . Test independently formatted) Tj ET
+0.08 0.14 0.20 rg BT /F3 10 Tf 43 622 Td (images, both superblocks, multiple retained snapshots, DAT allocator group) Tj ET
+0.08 0.14 0.20 rg BT /F3 10 Tf 43 608 Td (boundaries, tree splits, sparse mappings, damaged summaries, truncated logical) Tj ET
+0.08 0.14 0.20 rg BT /F3 10 Tf 43 594 Td (logs and cleaning with snapshots. Compare every historical and current payload) Tj ET
+0.08 0.14 0.20 rg BT /F3 10 Tf 43 580 Td (against independent mounts. Exact summary checksum coverage, binfo subtypes,) Tj ET
+0.08 0.14 0.20 rg BT /F3 10 Tf 43 566 Td (maximum-record encoding and all recovery paths need further source/fixture) Tj ET
+0.08 0.14 0.20 rg BT /F3 10 Tf 43 552 Td (validation before independent writer compatibility is claimed. Historical) Tj ET
+0.08 0.14 0.20 rg BT /F3 10 Tf 43 538 Td (provider evidence is identified in Implementation and qualification boundary.) Tj ET
+0.08 0.14 0.20 rg BT /F3 10 Tf 43 514 Td (Test independently recorded checkpoints and snapshots, damaged DAT translations) Tj ET
+0.08 0.14 0.20 rg BT /F3 10 Tf 43 500 Td (and interruption-safe cleaning.) Tj ET
+0.08 0.14 0.20 rg BT /F3 10 Tf 43 476 Td (Retained source:) Tj ET
+0.08 0.14 0.20 rg BT /F3 10 Tf 43 462 Td (https://github.com/Infiltrator-Projects/Filesystems/blob/101026021d9088d80b7f0f) Tj ET
+0.08 0.14 0.20 rg BT /F3 10 Tf 43 448 Td (472d9061f0e2c688a3/native/filesystems/nilfs2/linux/super.c \(blob 7ed64df82d\).) Tj ET
 0.2 0.3 0.4 rg BT /F1 9 Tf 43 32 Td (Historical development and engineering reference | 16) Tj ET
