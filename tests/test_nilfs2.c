@@ -48,14 +48,27 @@ int main(int argc,char **argv){
  IfsFsModuleApiEntryV2 get=(IfsFsModuleApiEntryV2)dlsym(lib,IFS_FS_COMMON_EXPORT_V2);assert(get);
  const IfsFsModuleApiV2*a=get();assert(ifs_fs_api_v2_valid(a,"nilfs2"));
  const IfsFsCoreOpsV2*core=(const void*)ifs_fs_group_v2(a,IFS_FS_GROUP_CORE);
- assert(core&&core->header.capabilities==IFS_FS_CORE_PROBE&&!core->mount&&!core->write&&!ifs_fs_group_v2(a,IFS_FS_GROUP_DEFRAG));
+ assert(core&&core->mount&&core->read&&!core->write&&!ifs_fs_group_v2(a,IFS_FS_GROUP_DEFRAG));
  struct context c={.fd=-1,.bytes=SIZE};
  if(argc==3){struct stat st;c.fd=open(argv[2],O_RDONLY);assert(c.fd>=0&&!fstat(c.fd,&st)&&st.st_size>0);c.bytes=(uint64_t)st.st_size;}
  else {image=calloc(1,SIZE);assert(image);}
  IfsFsHostRuntimeV2 h={.abi_version=2,.structure_bytes=sizeof(h),.capabilities=IFS_FS_HOST_READ_ONLY,.volume_bytes=c.bytes,.maximum_transfer_bytes=4096,.context=&c,.read_at=rd,.allocate=allocate,.release=release};
  for(c.sector=512;c.sector<=4096;c.sector*=8){
   h.logical_sector_bytes=h.physical_sector_bytes=c.sector;
-  if(argc==3){expect(core,&h,&c,IFS_FS_OK);continue;}
+  if(argc==3){
+   expect(core,&h,&c,IFS_FS_OK);
+   void *v=NULL;IfsFsVolumeInfoV2 info={.structure_bytes=sizeof(info)};
+   assert(core->mount(&h,&v,&info)==IFS_FS_ACCESS&&!v);
+   h.capabilities|=IFS_FS_HOST_EXCLUSIVE;
+   int rc=core->mount(&h,&v,&info);if(rc)fprintf(stderr,"native NILFS2 mount failed: %d\n",rc);
+   assert(rc==0&&v&&info.block_bytes==4096&&info.free_bytes>0);
+   char name[256];IfsFsEntryV2 e={.structure_bytes=sizeof(e),.name=name,.name_capacity=sizeof(name)};
+   assert(core->stat(v,"/",&e)==0&&e.type==IFS_FS_ENTRY_DIRECTORY);
+   assert(core->directory_entry(v,"/",0,&e)==IFS_FS_END);
+   assert(core->stat(v,"/absent",&e)==IFS_FS_NOT_FOUND);
+   assert(core->unmount(v)==0&&!c.allocs);h.capabilities&=~IFS_FS_HOST_EXCLUSIVE;
+   continue;
+  }
   memset(image,0,SIZE);fixture();expect(core,&h,&c,IFS_FS_OK);
   c.fail=1;expect(core,&h,&c,IFS_FS_IO_ERROR);c.fail=0;
   corrupt();expect(core,&h,&c,IFS_FS_CORRUPT);
