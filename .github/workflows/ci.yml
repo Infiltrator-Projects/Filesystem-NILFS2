@@ -32,6 +32,39 @@ jobs:
           build/test_nilfs2 ./build/NILFS2.so build/foreign.img
           build/test_nilfs2 ./build/freestanding/NILFS2.so build/foreign.img
           sha256sum -c build/before
+      - name: Independently populated NILFS2 media (test oracle only)
+        run: |
+          set -euo pipefail
+          # The reference implementation creates the disposable image only.
+          # Native providers must read it after unmount, never through VFS.
+          if ! sudo modprobe nilfs2; then
+            sudo apt-get install -y --no-install-recommends "linux-modules-extra-$(uname -r)"
+            sudo modprobe nilfs2
+          fi
+          truncate -s 536870912 build/populated.img
+          mkfs.nilfs2 -f build/populated.img
+          mkdir -p build/mnt
+          dd if=/dev/urandom of=build/proof.bin bs=33001 count=1 status=none
+          loop=$(sudo losetup --find --show build/populated.img)
+          cleanup() {
+            if mountpoint -q build/mnt; then sudo umount build/mnt; fi
+            sudo losetup -d "$loop"
+          }
+          trap cleanup EXIT
+          sudo mount -t nilfs2 -o rw,nogc "$loop" build/mnt
+          sudo cp build/proof.bin build/mnt/proof.bin
+          sudo mkdir build/mnt/sub
+          printf hello | sudo tee build/mnt/sub/note.txt >/dev/null
+          printf 'tail!' | sudo dd of=build/mnt/sparse.bin bs=1 seek=8192 status=none
+          sync
+          sudo cmp build/proof.bin build/mnt/proof.bin
+          sudo umount build/mnt
+          sudo losetup -d "$loop"
+          trap - EXIT
+          sha256sum build/populated.img > build/populated-before
+          build/test_nilfs2 ./build/NILFS2.so build/populated.img build/proof.bin
+          build/test_nilfs2 ./build/freestanding/NILFS2.so build/populated.img build/proof.bin
+          sha256sum -c build/populated-before
       - name: Sanitizer qualification
         run: |
           make clean
