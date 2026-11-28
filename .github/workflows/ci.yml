@@ -26,7 +26,7 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends nilfs-tools
-          truncate -s 134217728 build/foreign.img
+          truncate -s 268435456 build/foreign.img
           mkfs.nilfs2 -f build/foreign.img
           sha256sum build/foreign.img > build/before
           build/test_nilfs2 ./build/NILFS2.so build/foreign.img
