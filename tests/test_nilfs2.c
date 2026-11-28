@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #define _POSIX_C_SOURCE 200809L
 #include <infiltratr/filesystem_module_v2.h>
+#include "../Libraries/tests/filesystem_reader_lifetime.h"
 #include <assert.h>
 #include <dlfcn.h>
 #include <fcntl.h>
@@ -89,6 +90,7 @@ static void check_payload(const IfsFsCoreOpsV2*core,IfsFsHostRuntimeV2*h,struct 
  populated();
  h->capabilities|=IFS_FS_HOST_EXCLUSIVE;
  void*v=NULL;IfsFsVolumeInfoV2 info={.structure_bytes=sizeof(info)};
+ check_reader_lifetime(core, h);
  int rc=core->mount(h,&v,&info);if(rc)fprintf(stderr,"populated NILFS2 fixture mount %d\n",rc);
  assert(rc==0&&v&&info.free_bytes==(uint64_t)(SIZE/B/512-2)*512u*B);
  char name[256];IfsFsEntryV2 e={.structure_bytes=sizeof(e),.name=name,.name_capacity=sizeof(name)};
