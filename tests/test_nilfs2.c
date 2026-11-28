@@ -38,6 +38,80 @@ static void fixture(void){
 static void corrupt(void){image[8192+10]^=1;}
 static void absent(void){image[1030]=0;image[SIZE-4096+6]=0;}
 
+
+#define B 4096u
+#define SEED 0x12345678u
+static uint8_t *blk(unsigned n){return image+n*B;}
+static void inode_bytes(uint8_t*p,unsigned mode,unsigned links,uint64_t bytes,unsigned blocks){
+ put64(p,blocks);put64(p+8,bytes);put16(p+48,mode);put16(p+50,links);
+}
+static void ptr(uint8_t*i,unsigned slot,uint64_t b){assert(slot<6);put64(i+64+slot*8,b);}
+static void allocate_bit(uint8_t*p,unsigned n){p[n/8]|=(uint8_t)(1u<<(n%8));}
+static void dirent(uint8_t*p,unsigned id,unsigned rec,unsigned type,const char*name){
+ put64(p,id);put16(p+8,rec);p[10]=(uint8_t)strlen(name);p[11]=(uint8_t)type;memcpy(p+12,name,strlen(name));
+}
+static void refresh_anchor(void){
+ uint8_t *p=blk(1),*r=blk(14);put32(r,crc32(SEED,r+4,396));put32(p,crc32(SEED,p+4,14u*B-4u));
+}
+static void populated(void){
+ memset(image,0,SIZE);fixture();
+ memset(blk(1),0,14u*B);
+ uint8_t*s=image+1024;put16(s+116,1);put64(s+80,(SIZE/B/512-2)*512u);
+ put32(s+16,0);put32(s+16,crc32(SEED,s,280));memcpy(image+SIZE-B,s,1024);
+ uint8_t*p=blk(1);put32(p+8,0x1eaffa11);put16(p+12,64);put16(p+14,7);
+ put64(p+16,1);put32(p+40,14);put32(p+48,64);put64(p+56,1);
+ uint8_t*r=blk(14);put16(r+4,400);
+ uint8_t*dat=r+16,*cp=r+144,*su=r+272;
+ inode_bytes(dat,0100644,1,3u*B,3);ptr(dat,0,2);ptr(dat,1,3);ptr(dat,2,4);
+ inode_bytes(cp,0100644,1,B,1);ptr(cp,0,1);
+ inode_bytes(su,0100644,1,B,1);ptr(su,0,2);
+ put32(blk(2),32768u-9u);
+ for(unsigned v=1;v<=9;v++){
+  allocate_bit(blk(3),v);
+  uint8_t*e=blk(4)+32u*v;
+  put64(e,4u+v);put64(e+8,1);put64(e+16,UINT64_MAX);
+ }
+ p=blk(5);put64(p,1);uint8_t*c=p+192;put64(c+24,1);put64(c+48,3);
+ uint8_t*ifile=c+64;inode_bytes(ifile,0100644,1,3u*B,3);
+ ptr(ifile,0,3);ptr(ifile,1,4);ptr(ifile,2,5);
+ p=blk(6);put64(p,SIZE/B/512-2);put64(p+8,1);put64(p+16,0);
+ put32(p+32+8,14);put32(p+32+12,2);
+ put32(blk(7),32768u-3u);allocate_bit(blk(8),2);allocate_bit(blk(8),11);allocate_bit(blk(8),12);
+ p=blk(9)+2u*128u;inode_bytes(p,0040755,2,B,1);ptr(p,0,6);
+ p=blk(9)+11u*128u;inode_bytes(p,0100644,1,B*2u+5u,2);ptr(p,0,7);ptr(p,2,8);
+ p=blk(9)+12u*128u;inode_bytes(p,0100644,1,5,1);ptr(p,0,9);
+ p=blk(10);dirent(p,2,16,2,".");dirent(p+16,2,16,2,"..");
+ dirent(p+32,11,24,1,"sparse.bin");dirent(p+56,12,B-56u,1,"hello.txt");
+ memset(blk(11),'A',B);memcpy(blk(12),"tail!",5);memcpy(blk(13),"hello",5);
+ refresh_anchor();
+}
+static void check_payload(const IfsFsCoreOpsV2*core,IfsFsHostRuntimeV2*h,struct context*c){
+ populated();
+ h->capabilities|=IFS_FS_HOST_EXCLUSIVE;
+ void*v=NULL;IfsFsVolumeInfoV2 info={.structure_bytes=sizeof(info)};
+ int rc=core->mount(h,&v,&info);if(rc)fprintf(stderr,"populated NILFS2 fixture mount %d\n",rc);
+ assert(rc==0&&v&&info.free_bytes==(uint64_t)(SIZE/B/512-2)*512u*B);
+ char name[256];IfsFsEntryV2 e={.structure_bytes=sizeof(e),.name=name,.name_capacity=sizeof(name)};
+ assert(core->directory_entry(v,"/",0,&e)==0&&!strcmp(name,"sparse.bin"));
+ assert(core->directory_entry(v,"/",1,&e)==0&&!strcmp(name,"hello.txt"));
+ assert(core->directory_entry(v,"/",2,&e)==IFS_FS_END);
+ assert(core->stat(v,"/sparse.bin",&e)==0&&e.size_bytes==2u*B+5u);
+ uint8_t out[B+6u];
+ assert(core->read(v,"/sparse.bin",B-1u,out,sizeof(out))==0);
+ assert(out[0]=='A'&&!memcmp(out+B+1,"tail!",5));
+ for(unsigned j=1;j<=B;j++)assert(out[j]==0);
+ assert(core->read(v,"/hello.txt",0,out,5)==0&&!memcmp(out,"hello",5));
+ assert(core->unmount(v)==0&&!c->allocs);
+ /* A DAT record that expires before the mounted checkpoint must never
+  * yield the stale physical payload. Recompute outer CRCs deliberately. */
+ put64(blk(4)+9u*32u+16,1);refresh_anchor();
+ assert(core->mount(h,&v,&info)==0&&v);
+ assert(core->read(v,"/hello.txt",0,out,5)==IFS_FS_CORRUPT);
+ assert(core->unmount(v)==0&&!c->allocs);
+ populated();put32(blk(7),32768u-2u);refresh_anchor();
+ assert(core->mount(h,&v,&info)==IFS_FS_CORRUPT&&!v&&!c->allocs);
+ h->capabilities&=~IFS_FS_HOST_EXCLUSIVE;
+}
 static void expect(const IfsFsCoreOpsV2 *core,IfsFsHostRuntimeV2*h,struct context*c,int want){
  uint32_t v=99;int rc=core->probe(h,&v);
  if(rc!=want)fprintf(stderr,"expected %d got %d at sector %u\n",want,rc,c->sector);
@@ -64,7 +138,9 @@ int main(int argc,char **argv){
    assert(rc==0&&v&&info.block_bytes==4096&&info.free_bytes>0);
    char name[256];IfsFsEntryV2 e={.structure_bytes=sizeof(e),.name=name,.name_capacity=sizeof(name)};
    assert(core->stat(v,"/",&e)==0&&e.type==IFS_FS_ENTRY_DIRECTORY);
-   assert(core->directory_entry(v,"/",0,&e)==IFS_FS_END);
+   rc=core->directory_entry(v,"/",0,&e);
+   if(rc!=IFS_FS_END)fprintf(stderr,"independent root enumeration rc=%d name=%s type=%u\n",rc,name,e.type);
+   assert(rc==IFS_FS_END);
    assert(core->stat(v,"/absent",&e)==IFS_FS_NOT_FOUND);
    assert(core->unmount(v)==0&&!c.allocs);h.capabilities&=~IFS_FS_HOST_EXCLUSIVE;
    continue;
@@ -73,6 +149,7 @@ int main(int argc,char **argv){
   c.fail=1;expect(core,&h,&c,IFS_FS_IO_ERROR);c.fail=0;
   corrupt();expect(core,&h,&c,IFS_FS_CORRUPT);
   memset(image,0,SIZE);fixture();absent();expect(core,&h,&c,IFS_FS_NOT_FOUND);
+  check_payload(core,&h,&c);
  }
  if(c.fd>=0)assert(!close(c.fd));
  free(image);assert(!dlclose(lib));

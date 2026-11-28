@@ -116,7 +116,7 @@ static int same(const uint8_t*p,const char*q,unsigned n){for(unsigned j=0;j<n;j+
 static int scan(Volume*v,const uint8_t*i,const char*name,unsigned length,uint32_t index,Dirent*out){
  if((le16(i+48)&0170000u)!=0040000u)return IFS_FS_INVALID;
  uint64_t size=le64(i+8);if(!size||size%BS||size/BS>MAX_DIR_BLOCKS)return IFS_FS_UNSUPPORTED;
- unsigned hits=0;uint32_t ordinal=0;uint8_t p[BS];
+ unsigned hits=0,dots=0;uint32_t ordinal=0;uint8_t p[BS];
  for(uint64_t off=0;off<size;off+=BS){
   int rc=data_read(v,i,off,p,BS,0);if(rc)return rc;
   for(unsigned at=0;at<BS;){
@@ -126,7 +126,11 @@ static int scan(Volume*v,const uint8_t*i,const char*name,unsigned length,uint32_
    at+=rec;if(!id)continue;
    if(!n||type>7u)return IFS_FS_CORRUPT;
    for(unsigned j=0;j<n;j++)if(!d[12+j]||d[12+j]=='/')return IFS_FS_CORRUPT;
-   if((n==1u&&d[12]=='.')||(n==2u&&d[12]=='.'&&d[13]=='.'))continue;
+   if((n==1u&&d[12]=='.')||(n==2u&&d[12]=='.'&&d[13]=='.')){
+    unsigned flag=n==1u?1u:2u;
+    if((dots&flag)||type!=2u||off!=0u||id<2u)return IFS_FS_CORRUPT;
+    dots|=flag;continue;
+   }
    if((name&&n==length&&same(d+12,name,n))||(!name&&ordinal==index)){
     if(++hits!=1u)return IFS_FS_CORRUPT;
     out->id=id;out->type=type;out->n=n;
@@ -136,6 +140,7 @@ static int scan(Volume*v,const uint8_t*i,const char*name,unsigned length,uint32_
    ordinal++;
   }
  }
+ if(dots!=3u)return IFS_FS_CORRUPT;
  return hits?0:name?IFS_FS_NOT_FOUND:IFS_FS_END;
 }
 static int entry_inode(Volume*v,const Dirent*d,uint8_t*i){
