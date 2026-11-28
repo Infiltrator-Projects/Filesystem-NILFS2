@@ -138,9 +138,16 @@ int main(int argc,char **argv){
    assert(rc==0&&v&&info.block_bytes==4096&&info.free_bytes>0);
    char name[256];IfsFsEntryV2 e={.structure_bytes=sizeof(e),.name=name,.name_capacity=sizeof(name)};
    assert(core->stat(v,"/",&e)==0&&e.type==IFS_FS_ENTRY_DIRECTORY);
-   rc=core->directory_entry(v,"/",0,&e);
-   if(rc!=IFS_FS_END)fprintf(stderr,"independent root enumeration rc=%d name=%s type=%u\n",rc,name,e.type);
-   assert(rc==IFS_FS_END);
+   /* Ubuntu's nilfs-utils v2.2.9 explicitly creates the zero-length
+    * .nilfs regular file (nilfs_mkfs_make_rootdir / make_dot_nilfs).
+    * This is the independent formatter's actual namespace, not an
+    * empty-root assumption. Check identity, type, length and exact EOF. */
+   assert(core->directory_entry(v,"/",0,&e)==0&&!strcmp(name,".nilfs")&&e.type==IFS_FS_ENTRY_FILE&&e.size_bytes==0);
+   assert(core->stat(v,"/.nilfs",&e)==0&&e.type==IFS_FS_ENTRY_FILE&&e.size_bytes==0);
+   uint8_t byte=0;
+   assert(core->read(v,"/.nilfs",0,&byte,0)==0);
+   assert(core->read(v,"/.nilfs",0,&byte,1)==IFS_FS_INVALID);
+   assert(core->directory_entry(v,"/",1,&e)==IFS_FS_END);
    assert(core->stat(v,"/absent",&e)==IFS_FS_NOT_FOUND);
    assert(core->unmount(v)==0&&!c.allocs);h.capabilities&=~IFS_FS_HOST_EXCLUSIVE;
    continue;
