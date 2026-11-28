@@ -61,6 +61,9 @@ jobs:
           sudo umount build/mnt
           sudo losetup -d "$loop"
           trap - EXIT
+          # Native superblock copies can point to different checkpoints.
+          od -Ax -tx8 -j 1024 -N 280 build/populated.img
+          od -Ax -tx8 -j 536866816 -N 280 build/populated.img
           sha256sum build/populated.img > build/populated-before
           build/test_nilfs2 ./build/NILFS2.so build/populated.img build/proof.bin
           build/test_nilfs2 ./build/freestanding/NILFS2.so build/populated.img build/proof.bin

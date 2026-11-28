@@ -110,6 +110,12 @@ static void check_payload(const IfsFsCoreOpsV2*core,IfsFsHostRuntimeV2*h,struct 
  assert(core->unmount(v)==0&&!c->allocs);
  populated();put32(blk(7),32768u-2u);refresh_anchor();
  assert(core->mount(h,&v,&info)==IFS_FS_CORRUPT&&!v&&!c->allocs);
+ /* A conflicting same-checkpoint anchor is corrupt, not an excuse
+  * to mount either copy. A dirty newest anchor cannot mount. */
+ populated();uint8_t *s=image+SIZE-B;put64(s+64,2);put32(s+16,0);put32(s+16,crc32(SEED,s,280));
+ assert(core->mount(h,&v,&info)==IFS_FS_CORRUPT&&!v&&!c->allocs);
+ populated();s=image+SIZE-B;put16(s+116,0);put32(s+16,0);put32(s+16,crc32(SEED,s,280));
+ assert(core->mount(h,&v,&info)==IFS_FS_UNSUPPORTED&&!v&&!c->allocs);
  h->capabilities&=~IFS_FS_HOST_EXCLUSIVE;
 }
 static void expect(const IfsFsCoreOpsV2 *core,IfsFsHostRuntimeV2*h,struct context*c,int want){

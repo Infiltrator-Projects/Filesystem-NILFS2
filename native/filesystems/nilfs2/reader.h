@@ -208,14 +208,15 @@ static int mount_volume(const IfsFsHostRuntimeV2*h,void**out,IfsFsVolumeInfoV2*v
  uint8_t a[1024],b[1024],p[BS],root[128],verify[128];
  rc=read_bytes(h,1024,a,1024);if(rc)return rc;
  rc=read_bytes(h,(h->volume_bytes/BS-1u)*BS,b,1024);if(rc)return rc;
- /* Initial profile requires two coherent committed clean copies.
-  * Do not silently fall back to an older checkpoint or replay logs. */
- if(sb(h,a)||sb(h,b)||!equal(a+56,b+56,24)||le16(a+116)!=1u||le16(b+116)!=1u||
-    le32(a+20)!=2u||le16(a+144)!=128u||le16(a+146)!=32u||le16(a+148)!=192u||le16(a+150)!=16u||
-    le64(a+264)&~UINT64_C(1)||le64(a+24)>MAX_SEGMENTS)return IFS_FS_UNSUPPORTED;
+ /* Both headers must be valid, but native cleanup only updates the
+  * newest copy when its checkpoint advanced (the_nilfs.c and super.c).
+  * A stale backup must not suppress a newer committed clean root. */
+ const uint8_t*s;rc=select_header(h,a,b,&s,1);if(rc)return rc;
+ if(le32(s+20)!=2u||le16(s+144)!=128u||le16(s+146)!=32u||le16(s+148)!=192u||le16(s+150)!=16u||
+    le64(s+264)&~UINT64_C(1)||le64(s+24)>MAX_SEGMENTS)return IFS_FS_UNSUPPORTED;
  Volume*v=h->allocate(h->context,sizeof(*v));if(!v)return IFS_FS_NO_MEMORY;
- v->h=h;v->first=le64(a+40);v->segments=le64(a+24);v->per=le32(a+48);v->limit=v->segments*v->per;v->cno=le64(a+56);v->free=0;v->live=NULL;v->verified=0;
- uint64_t start=le64(a+64);
+ v->h=h;v->first=le64(s+40);v->segments=le64(s+24);v->per=le32(s+48);v->limit=v->segments*v->per;v->cno=le64(s+56);v->free=0;v->live=NULL;v->verified=0;
+ uint64_t start=le64(s+64);
  rc=physical(v,start,p);if(rc)goto done;
  uint32_t n=le32(p+40);
  if(!n||n>v->limit-start||(start+n-1u)/v->per!=start/v->per){rc=IFS_FS_CORRUPT;goto done;}

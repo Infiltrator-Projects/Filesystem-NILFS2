@@ -39,7 +39,7 @@ static int anchor(const IfsFsHostRuntimeV2 *h,const uint8_t *s)
     if(bytes<16u+3u*le16(s+144)||bytes>b||crc32(seed,p+4,bytes-4)!=le32(p))return IFS_FS_CORRUPT;
     return IFS_FS_OK;
 }
-static int sb(const IfsFsHostRuntimeV2 *h,uint8_t *p)
+static int sb_header(const IfsFsHostRuntimeV2 *h,uint8_t *p)
 {
     if(le16(p+6)!=0x3434u)return IFS_FS_NOT_FOUND;
     if(le32(p)!=2u||le32(p+20)>2u||le64(p+272))return IFS_FS_UNSUPPORTED;
@@ -53,16 +53,28 @@ static int sb(const IfsFsHostRuntimeV2 *h,uint8_t *p)
        first>=per||!le64(p+56)||le64(p+64)<first||le64(p+64)>=segments*per||
        le64(p+80)>segments*per||inode<128u||inode>(block-16u)/3u||
        le16(p+146)<32u||le16(p+148)<192u||le16(p+150)<16u)return IFS_FS_CORRUPT;
-    return anchor(h,p);
+    return IFS_FS_OK;
+}
+/* Native redundant superblocks are intentionally allowed to contain
+ * different committed checkpoints. Select by checkpoint number before
+ * validating the referenced log, never silently fall back to older
+ * content when the latest checksum-valid header has a corrupt anchor. */
+static int select_header(const IfsFsHostRuntimeV2*h,uint8_t*a,uint8_t*b,const uint8_t**chosen,int mount){
+ int x=sb_header(h,a),y=sb_header(h,b);
+ if(x&&y)return x==IFS_FS_NOT_FOUND?y:x;
+ if(mount&&(x||y))return IFS_FS_UNSUPPORTED;
+ if(!x&&!y&&(!equal(a+20,b+20,36)||!equal(a+152,b+152,16)||!equal(a+144,b+144,8)||le32(a+12)!=le32(b+12)))return IFS_FS_CORRUPT;
+ if(!x&&!y&&le64(a+56)==le64(b+56)&&!equal(a+56,b+56,24))return IFS_FS_CORRUPT;
+ *chosen=x?b:y?a:le64(b+56)>le64(a+56)?b:a;
+ if(mount&&(le16(*chosen+116)!=1u||(!x&&!y&&le64(a+56)==le64(b+56)&&(le16(a+116)!=1u||le16(b+116)!=1u))))return IFS_FS_UNSUPPORTED;
+ return anchor(h,*chosen);
 }
 static int identify(const IfsFsHostRuntimeV2 *h,uint32_t *variant)
 {
     uint8_t a[1024],b[1024];int r=read_bytes(h,1024,a,sizeof(a));if(r)return r;
     if(h->volume_bytes<8192u)return IFS_FS_NOT_FOUND;
     r=read_bytes(h,((h->volume_bytes/4096u)-1u)*4096u,b,sizeof(b));if(r)return r;
-    int x=sb(h,a),y=sb(h,b);
-    if(x&&y)return x==IFS_FS_NOT_FOUND?y:x;
-    if(!x&&!y&&(!equal(a+20,b+20,36)||!equal(a+152,b+152,16)))return IFS_FS_CORRUPT;
+    const uint8_t*selected; r=select_header(h,a,b,&selected,0);if(r)return r;
     *variant=2;return IFS_FS_OK;
 }
 static int probe(const IfsFsHostRuntimeV2 *h,uint32_t *variant){
